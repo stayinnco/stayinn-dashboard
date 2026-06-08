@@ -256,7 +256,7 @@
   }
   .stayinn .section-title { color: var(--gold); border-bottom-color: rgba(200,169,94,0.3); }
   .stayinn-cards {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
   }
   .stayinn-card {
     background: rgba(255,255,255,0.06); border: 1px solid rgba(200,169,94,0.25);
@@ -266,7 +266,7 @@
     font-size: 11px; color: var(--gold); font-weight: 600;
     letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;
   }
-  .stayinn-card .value { font-size: 20px; font-weight: 700; }
+  .stayinn-card .value { font-size: 28px; font-weight: 700; }
 
   /* Empty state */
   .empty-state {
@@ -294,6 +294,33 @@
     font-size: 12px; margin-top: 24px;
   }
 
+  /* Profiles */
+  .profile-bar {
+    background: white; border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 20px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .profile-bar label { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .profile-select {
+    flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 14px; background: white; cursor: pointer;
+  }
+  .profile-select:focus { outline: none; border-color: var(--gold); }
+  .profile-actions { display: flex; gap: 8px; }
+  .btn-save-profile {
+    background: var(--navy); color: white; border: none; padding: 8px 16px;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-save-profile:hover { background: var(--navy-light); }
+  .btn-del-profile {
+    background: white; color: var(--danger); border: 1px solid var(--danger);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .btn-del-profile:hover { background: var(--danger-soft); }
+  @media print {
+    .profile-bar { display: none !important; }
+  }
+
   @media print {
     .upload-zone, .settings-panel, .hero-actions, .footer { display: none !important; }
     .container { max-width: 100%; padding: 0; }
@@ -319,6 +346,17 @@
     <div class="hero-actions no-print">
       <button onclick="toggleSettings()">⚙️ Configurações</button>
       <button onclick="window.print()">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+
+  <div class="profile-bar no-print">
+    <label>🏨 Unidade:</label>
+    <select class="profile-select" id="profileSelect" onchange="loadProfile(this.value)">
+      <option value="">— selecionar perfil salvo —</option>
+    </select>
+    <div class="profile-actions">
+      <button class="btn-save-profile" onclick="saveProfile()">💾 Salvar perfil atual</button>
+      <button class="btn-del-profile" onclick="deleteProfile()" title="Excluir perfil selecionado">🗑️</button>
     </div>
   </div>
 
@@ -356,7 +394,7 @@
 
       <div class="royalty-big">
         <label>Royalty Stayinn (% sobre líquido)</label>
-        <input type="number" id="royaltyInput" value="6" min="0" max="100" step="0.1" onchange="saveSettings(); renderAll();">
+        <input type="number" id="royaltyInput" value="7" min="0" max="100" step="0.1" onchange="saveSettings(); renderAll();">
         <span class="pct">%</span>
         <small>Esta é a porcentagem que a Stayinn cobra. Aplica nos canais marcados como "tem royalty" na tabela abaixo. Ajuste por cliente.</small>
       </div>
@@ -412,27 +450,37 @@
 
 <script>
 // ============= STATE =============
-const STORAGE_KEY = 'stayinn_v3';
-const SETTINGS_KEY = 'stayinn_settings_v3';
+const STORAGE_KEY = 'stayinn_v4';
+const SETTINGS_KEY = 'stayinn_settings_v4';
 let reservas = [];
 
 const defaultChannels = [
-  { canal: 'hqb2',            comissao: 0,    royalty: true },
-  { canal: 'boo',             comissao: 13,   royalty: true },
-  { canal: 'exp',             comissao: 15,   royalty: true },
-  { canal: 'air',             comissao: 0,    royalty: false },
-  { canal: 'walkin',          comissao: 0,    royalty: false },
-  { canal: 'whatsapp',        comissao: 0,    royalty: false },
-  { canal: 'callcenter',      comissao: 3,    royalty: true },
-  { canal: 'googlehotel',     comissao: 0,    royalty: true },
-  { canal: 'centra_reservas', comissao: 0,    royalty: true },
-  { canal: 'deco',            comissao: 10,   royalty: true },
-  { canal: 'recomendation',   comissao: 0,    royalty: false },
-  { canal: 'Outros',          comissao: 0,    royalty: false },
+  // HQBeds direto
+  { canal: 'hqb2',             comissao: 0,   royalty: true },
+  { canal: 'hw2',              comissao: 0,   royalty: true },
+  // OTAs
+  { canal: 'boo',              comissao: 13,  royalty: true },  // Booking
+  { canal: 'exp',              comissao: 0,   royalty: true },  // Expedia (desconta na fonte)
+  { canal: 'air',              comissao: 0,   royalty: true },  // Airbnb
+  { canal: 'deco',             comissao: 0,   royalty: true },  // Decolar (desconta na fonte)
+  { canal: 'other',            comissao: 0,   royalty: false }, // Direto sem intermediário
+  { canal: 'website',          comissao: 0,   royalty: true },  // Site próprio
+  // Canais com intermediário
+  { canal: 'callcenter',       comissao: 3,   royalty: true },
+  { canal: 'callce',           comissao: 3,   royalty: true },  // callcenter abreviado
+  { canal: 'googlehotel',      comissao: 0,   royalty: true },
+  { canal: 'centra_reservas',  comissao: 3,   royalty: true },
+  { canal: 'centra_de_reserv', comissao: 3,   royalty: true },
+  // Direto sem royalty
+  { canal: 'walkin',           comissao: 0,   royalty: false },
+  { canal: 'whatsapp',         comissao: 0,   royalty: false },
+  { canal: 'recomendation',    comissao: 0,   royalty: false },
+  { canal: 'bnw',              comissao: 0,   royalty: false }, // sem royalty
+  { canal: 'Outros',           comissao: 0,   royalty: false },
 ];
 
 let settings = {
-  royalty: 6,
+  royalty: 7,
   capacity: 0,
   days: 30,
   channels: JSON.parse(JSON.stringify(defaultChannels)),
@@ -447,10 +495,14 @@ const statusBadgeMap = {
   'emanalise': 'badge-warning',
   'hospedado': 'badge-success', 'encerrada': 'badge-gray',
   'cancelada': 'badge-danger', 'noshow': 'badge-danger',
+  'cancelada/canceladapormodificação': 'badge-danger',
 };
 function statusBadgeFor(s) { return statusBadgeMap[normStatus(s)] || 'badge-gray'; }
-const inativosNorm = ['cancelada', 'noshow'];
-function isInativo(s) { return inativosNorm.includes(normStatus(s)); }
+// Só exclui canceladas — No Show, Hospedado, Encerrada, Nova etc. entram
+function isInativo(s) {
+  const n = normStatus(s);
+  return n === 'cancelada' || n === 'canceladapormodificacao' || n === 'canceladamodificacao';
+}
 
 // ============= UTILITIES =============
 function num(x) {
@@ -477,7 +529,7 @@ function parseData(x) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-const brl = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+const brl = v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 const brl2 = v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 
 function toast(msg, type='info') {
@@ -532,8 +584,14 @@ function parseCSV(text) {
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
     if (cols.length < 5) continue;
+    // Ignorar linha de totais do HQBeds (sem número de reserva válido)
+    const numReserva = (cols[idx.reserva] || '').trim();
+    if (!numReserva || isNaN(parseFloat(numReserva))) continue;
+    // Ignorar linhas sem origem (podem ser subtotais ou linhas vazias)
+    const origemVal = (cols[idx.origem] || '').trim();
+    if (!origemVal) continue;
     out.push({
-      reserva: cols[idx.reserva] || '',
+      reserva: numReserva,
       checkin: idx.de >= 0 ? parseData(cols[idx.de]) : null,
       checkout: idx.ate >= 0 ? parseData(cols[idx.ate]) : null,
       nome: ((cols[idx.nome] || '') + ' ' + (cols[idx.sobrenome] || '')).trim(),
@@ -699,18 +757,143 @@ function removeChannel(i) {
 }
 
 function resetSettings() {
-  if (!confirm('Restaurar configurações para o padrão? (Stayinn 6%, canais padrão)')) return;
+  if (!confirm('Restaurar configurações para o padrão? (Stayinn 7%, canais padrão)')) return;
   settings = {
-    royalty: 6,
+    royalty: 7,
     capacity: settings.capacity,
     days: settings.days,
     channels: JSON.parse(JSON.stringify(defaultChannels)),
   };
-  document.getElementById('royaltyInput').value = 6;
+  document.getElementById('royaltyInput').value = 7;
   renderChannels();
   saveSettings();
   renderAll();
   toast('Configurações restauradas', 'success');
+}
+
+// ============= PROFILES =============
+const PROFILES_KEY = 'stayinn_profiles_v1';
+
+function getProfiles() {
+  try { return JSON.parse(localStorage.getItem(PROFILES_KEY)) || {}; } catch { return {}; }
+}
+
+function saveProfiles(profiles) {
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch {}
+}
+
+function renderProfileSelect() {
+  const profiles = getProfiles();
+  const sel = document.getElementById('profileSelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— selecionar perfil salvo —</option>';
+  Object.keys(profiles).sort().forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function saveProfile() {
+  const unidade = document.getElementById('unidade-input').textContent.trim();
+  const name = unidade || prompt('Nome da unidade para salvar:');
+  if (!name) return;
+  saveSettings();
+  const profiles = getProfiles();
+  profiles[name] = {
+    royalty: settings.royalty,
+    channels: JSON.parse(JSON.stringify(settings.channels)),
+    capacity: settings.capacity,
+    days: settings.days,
+  };
+  saveProfiles(profiles);
+  renderProfileSelect();
+  // Pré-carregar perfis de todas as unidades
+  (function() {
+    const profiles = getProfiles();
+      if (!profiles['Brisas Chalés']) {
+        profiles['Brisas Chalés'] = { royalty: 7, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Chalé Guiados Pelo Alto']) {
+        profiles['Chalé Guiados Pelo Alto'] = { royalty: 7, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Estância Nazari']) {
+        profiles['Estância Nazari'] = { royalty: 8, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 4, "royalty": true}, {"canal": "callce", "comissao": 4, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 4, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 4, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Graffi Beach House']) {
+        profiles['Graffi Beach House'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Graffi City House']) {
+        profiles['Graffi City House'] = { royalty: 7, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Happiness House']) {
+        profiles['Happiness House'] = { royalty: 8, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Innbox Canasvieiras Hostel']) {
+        profiles['Innbox Canasvieiras Hostel'] = { royalty: 7, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 4, "royalty": true}, {"canal": "callce", "comissao": 4, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 4, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 4, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Innbox Canasvieiras Studios']) {
+        profiles['Innbox Canasvieiras Studios'] = { royalty: 7, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 16, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 4, "royalty": true}, {"canal": "callce", "comissao": 4, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 4, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 4, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Innbox Porto Belo']) {
+        profiles['Innbox Porto Belo'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 15, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 6, "royalty": true}, {"canal": "callce", "comissao": 6, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 6, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 6, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Lofts Urbano Urubici']) {
+        profiles['Lofts Urbano Urubici'] = { royalty: 7, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Pousada Nó de Pinho']) {
+        profiles['Pousada Nó de Pinho'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Pousada Sunset']) {
+        profiles['Pousada Sunset'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Santê Cabana']) {
+        profiles['Santê Cabana'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 4, "royalty": true}, {"canal": "callce", "comissao": 4, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 4, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 4, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Sítios Moriah']) {
+        profiles['Sítios Moriah'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+      if (!profiles['Tetris Container']) {
+        profiles['Tetris Container'] = { royalty: 6, capacity: 0, days: 30, channels: [{"canal": "hqb2", "comissao": 0, "royalty": true}, {"canal": "hw2", "comissao": 0, "royalty": true}, {"canal": "boo", "comissao": 13, "royalty": true}, {"canal": "exp", "comissao": 0, "royalty": true}, {"canal": "air", "comissao": 0, "royalty": true}, {"canal": "deco", "comissao": 0, "royalty": true}, {"canal": "other", "comissao": 0, "royalty": false}, {"canal": "website", "comissao": 0, "royalty": false}, {"canal": "callcenter", "comissao": 3, "royalty": true}, {"canal": "callce", "comissao": 3, "royalty": true}, {"canal": "googlehotel", "comissao": 0, "royalty": true}, {"canal": "centra_reservas", "comissao": 3, "royalty": true}, {"canal": "centra_de_reserv", "comissao": 3, "royalty": true}, {"canal": "walkin", "comissao": 0, "royalty": false}, {"canal": "whatsapp", "comissao": 0, "royalty": false}, {"canal": "recomendation", "comissao": 0, "royalty": false}, {"canal": "bnw", "comissao": 0, "royalty": false}, {"canal": "Outros", "comissao": 0, "royalty": false}] };
+      }
+    saveProfiles(profiles);
+    renderProfileSelect();
+  })();
+  document.getElementById('profileSelect').value = name;
+  toast('Perfil "' + name + '" salvo!', 'success');
+}
+
+function loadProfile(name) {
+  if (!name) return;
+  const profiles = getProfiles();
+  const p = profiles[name];
+  if (!p) return;
+  settings.royalty = p.royalty;
+  settings.channels = JSON.parse(JSON.stringify(p.channels));
+  if (p.capacity) settings.capacity = p.capacity;
+  if (p.days) settings.days = p.days;
+  document.getElementById('royaltyInput').value = p.royalty;
+  document.getElementById('unidade-input').textContent = name;
+  if (p.capacity) document.getElementById('capacityInput').value = p.capacity;
+  if (p.days) document.getElementById('daysInput').value = p.days;
+  renderChannels();
+  saveSettings();
+  renderAll();
+  toast('Perfil "' + name + '" carregado!', 'success');
+}
+
+function deleteProfile() {
+  const sel = document.getElementById('profileSelect');
+  const name = sel.value;
+  if (!name) { toast('Selecione um perfil para excluir', 'error'); return; }
+  if (!confirm('Excluir perfil "' + name + '"?')) return;
+  const profiles = getProfiles();
+  delete profiles[name];
+  saveProfiles(profiles);
+  renderProfileSelect();
+  toast('Perfil "' + name + '" excluído', 'success');
 }
 
 function loadSettings() {
@@ -844,7 +1027,11 @@ function renderDashboard() {
   // Por status
   const byStatus = {};
   dados.forEach(r => {
-    const k = r.status || '(sem status)';
+    // Agrupar "Cancelada por Modificação" junto com "Cancelada"
+    let k = r.status || '(sem status)';
+    const kNorm = normStatus(k);
+    if (kNorm === 'canceladapormodificacao' || kNorm === 'canceladamodificacao') k = 'Cancelada/Cancelada por Modificação';
+    if (kNorm === 'cancelada') k = 'Cancelada/Cancelada por Modificação';
     if (!byStatus[k]) byStatus[k] = { qtd: 0, receita: 0 };
     byStatus[k].qtd++;
     byStatus[k].receita += r.total;
@@ -947,23 +1134,9 @@ function renderDashboard() {
 
   html += `<div class="stayinn">
     <div class="section-title">💼 Repasses Stayinn (royalty ${settings.royalty}%)</div>
-    <div class="stayinn-cards">
-      <div class="stayinn-card">
-        <div class="label">Comissão total</div>
-        <div class="value">${brl2(totalComissao)}</div>
-      </div>
-      <div class="stayinn-card">
-        <div class="label">Total Líquido</div>
-        <div class="value">${brl2(totalLiquido)}</div>
-      </div>
-      <div class="stayinn-card">
-        <div class="label">Royalties</div>
-        <div class="value">${brl2(totalRoyalties)}</div>
-      </div>
-      <div class="stayinn-card">
-        <div class="label">Total a Pagar</div>
-        <div class="value">${brl2(totalStayinn)}</div>
-      </div>
+    <div style="text-align:center; padding: 16px 0 8px;">
+      <div style="font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:12px;">Total a Pagar Stayinn</div>
+      <div style="font-size:52px; font-weight:800; letter-spacing:-1px; color:#fff;">${brl2(totalRoyalties)}</div>
     </div>
   </div>`;
 
@@ -1000,7 +1173,8 @@ function renderDashboard() {
   if (ctxS) {
     const statusColors = statuses.map(([nome]) => {
       const map = {'hospedado':'#2D7A4F','encerrada':'#6B7280','confirmada':'#1976D2',
-        'emanalise':'#D4A03E','cancelada':'#B83A3A','noshow':'#B83A3A','nova':'#7F77DD'};
+        'emanalise':'#D4A03E','cancelada':'#B83A3A','noshow':'#B83A3A','nova':'#7F77DD',
+        'cancelada/canceladapormodificação':'#B83A3A'};
       return map[normStatus(nome)] || '#888';
     });
     new Chart(ctxS, {
